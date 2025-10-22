@@ -1,16 +1,31 @@
 from __future__ import annotations
 
-from typing import Iterable, List, Optional
+from typing import TYPE_CHECKING, Any, Iterable, List, Optional
 
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+
+try:
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    go = None  # type: ignore[assignment]
+    make_subplots = None  # type: ignore[assignment]
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from plotly.graph_objects import Figure as PlotlyFigure
+else:
+    PlotlyFigure = Any
 
 FONT_FAMILY = "Hiragino Kaku Gothic ProN, Hiragino Sans, Noto Sans JP, Meiryo, sans-serif"
+PLOTLY_IMPORT_ERROR_MESSAGE = "Plotly がインストールされていないためグラフを表示できません。requirements.txt を参照して Plotly を追加してください。"
 
 
-def _default_layout(fig: go.Figure, title: str) -> go.Figure:
+def _plotly_available() -> bool:
+    return go is not None and make_subplots is not None
+
+
+def _default_layout(fig: PlotlyFigure, title: str) -> PlotlyFigure:
     fig.update_layout(
         title=title,
         font=dict(family=FONT_FAMILY),
@@ -22,7 +37,11 @@ def _default_layout(fig: go.Figure, title: str) -> go.Figure:
     return fig
 
 
-def create_sparkline(years: Iterable[int], values: Iterable[Optional[float]]) -> go.Figure:
+def create_sparkline(
+    years: Iterable[int], values: Iterable[Optional[float]]
+) -> Optional[PlotlyFigure]:
+    if not _plotly_available():
+        return None
     fig = go.Figure()
     cleaned_years: List[int] = [int(y) for y in years]
     cleaned_values: List[Optional[float]] = [v if v is None or np.isfinite(v) else None for v in values]
@@ -51,7 +70,9 @@ def sales_profit_trend(
     primary: pd.DataFrame,
     peer_major: Optional[pd.DataFrame] = None,
     peer_overall: Optional[pd.DataFrame] = None,
-) -> go.Figure:
+) -> Optional[PlotlyFigure]:
+    if not _plotly_available():
+        return None
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     if primary is None or primary.empty:
         return _default_layout(fig, "売上・利益推移")
@@ -121,7 +142,9 @@ def sales_profit_trend(
     return _default_layout(fig, "売上・利益推移")
 
 
-def margin_trend(primary: pd.DataFrame) -> go.Figure:
+def margin_trend(primary: pd.DataFrame) -> Optional[PlotlyFigure]:
+    if not _plotly_available():
+        return None
     fig = go.Figure()
     if primary is None or primary.empty:
         return _default_layout(fig, "利益率推移")
@@ -146,7 +169,9 @@ def margin_trend(primary: pd.DataFrame) -> go.Figure:
     return _default_layout(fig, "利益率推移")
 
 
-def bs_composition(primary: pd.DataFrame) -> go.Figure:
+def bs_composition(primary: pd.DataFrame) -> Optional[PlotlyFigure]:
+    if not _plotly_available():
+        return None
     fig = make_subplots(rows=1, cols=2, shared_y=True, horizontal_spacing=0.12)
     if primary is None or primary.empty:
         return _default_layout(fig, "BS 構成比")
@@ -222,7 +247,9 @@ def bs_composition(primary: pd.DataFrame) -> go.Figure:
     return _default_layout(fig, "BS 構成比")
 
 
-def ebitda_coverage(primary: pd.DataFrame) -> go.Figure:
+def ebitda_coverage(primary: pd.DataFrame) -> Optional[PlotlyFigure]:
+    if not _plotly_available():
+        return None
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     if primary is None or primary.empty:
         return _default_layout(fig, "EBITDA と利払")
@@ -261,7 +288,9 @@ def ebitda_coverage(primary: pd.DataFrame) -> go.Figure:
     return _default_layout(fig, "EBITDA と利払")
 
 
-def productivity_vs_labor_share(primary: pd.DataFrame) -> go.Figure:
+def productivity_vs_labor_share(primary: pd.DataFrame) -> Optional[PlotlyFigure]:
+    if not _plotly_available():
+        return None
     fig = go.Figure()
     if primary is None or primary.empty:
         return _default_layout(fig, "労働生産性と労働分配率")
@@ -284,7 +313,9 @@ def productivity_vs_labor_share(primary: pd.DataFrame) -> go.Figure:
     return _default_layout(fig, "労働生産性と労働分配率")
 
 
-def dupont_lines(primary: pd.DataFrame) -> go.Figure:
+def dupont_lines(primary: pd.DataFrame) -> Optional[PlotlyFigure]:
+    if not _plotly_available():
+        return None
     fig = go.Figure()
     if primary is None or primary.empty:
         return _default_layout(fig, "DuPont 分解")
@@ -311,6 +342,7 @@ def dupont_lines(primary: pd.DataFrame) -> go.Figure:
 
 __all__ = [
     "FONT_FAMILY",
+    "PLOTLY_IMPORT_ERROR_MESSAGE",
     "create_sparkline",
     "dupont_lines",
     "ebitda_coverage",
