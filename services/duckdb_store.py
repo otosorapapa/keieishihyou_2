@@ -12,6 +12,10 @@ except ModuleNotFoundError as exc:  # pragma: no cover - runtime fallback
 else:  # pragma: no cover - exercised implicitly when DuckDB is available
     _DUCKDB_IMPORT_ERROR = None
 
+DUCKDB_IMPORT_ERROR_MESSAGE = (
+    "DuckDB backend is unavailable. requirements.txt を参照して 'duckdb' パッケージをインストールしてください。"
+)
+
 LOGGER = logging.getLogger(__name__)
 DUCKDB_AVAILABLE = duckdb is not None
 import pandas as pd
@@ -26,9 +30,7 @@ class DuckDBStore:
 
     def _connect(self) -> duckdb.DuckDBPyConnection:
         if not DUCKDB_AVAILABLE:
-            raise RuntimeError(
-                "DuckDB backend is unavailable. Install the 'duckdb' package to enable persistence."
-            ) from _DUCKDB_IMPORT_ERROR
+            raise RuntimeError(DUCKDB_IMPORT_ERROR_MESSAGE) from _DUCKDB_IMPORT_ERROR
         return duckdb.connect(str(self.path))  # type: ignore[union-attr]
 
     def ensure_table(self, df: pd.DataFrame) -> None:
@@ -51,9 +53,7 @@ class DuckDBStore:
 
         self.ensure_table(df)
         if not DUCKDB_AVAILABLE:
-            raise RuntimeError(
-                "DuckDB backend is unavailable. Install the 'duckdb' package to enable CSV updates to persist."
-            ) from _DUCKDB_IMPORT_ERROR
+            raise RuntimeError(DUCKDB_IMPORT_ERROR_MESSAGE) from _DUCKDB_IMPORT_ERROR
         with self._connect() as conn:
             conn.register("tmp_df", df)
             conn.execute(
@@ -72,7 +72,7 @@ class DuckDBStore:
     def read_all(self) -> Optional[pd.DataFrame]:
         if not DUCKDB_AVAILABLE:
             LOGGER.warning(
-                "DuckDB backend is unavailable. Falling back to baseline CSV only."
+                "%s Falling back to baseline CSV only.", DUCKDB_IMPORT_ERROR_MESSAGE
             )
             return None
         if not self.path.exists():
