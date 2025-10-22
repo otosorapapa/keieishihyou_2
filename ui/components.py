@@ -11,6 +11,11 @@ except ModuleNotFoundError:  # pragma: no cover - executed when package missing
     AgGrid = None  # type: ignore[assignment]
     GridOptionsBuilder = None  # type: ignore[assignment]
 
+try:  # pragma: no cover - optional dependency
+    import altair as alt
+except ModuleNotFoundError:  # pragma: no cover - executed when package missing
+    alt = None  # type: ignore[assignment]
+
 AGGRID_IMPORT_ERROR_MESSAGE = "表の高度な表示機能を利用するには streamlit-aggrid をインストールしてください。"
 
 from services.metrics import KPIResult
@@ -20,6 +25,24 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from plotly.graph_objects import Figure
 else:
     Figure = object
+
+
+def _is_plotly_figure(obj: object) -> bool:
+    return hasattr(obj, "to_plotly_json")
+
+
+def _render_chart(fig: Optional[object], *, use_container_width: bool = True, config: Optional[dict[str, object]] = None) -> str:
+    if fig is None:
+        st.warning(PLOTLY_IMPORT_ERROR_MESSAGE)
+        return "none"
+    if _is_plotly_figure(fig):
+        st.plotly_chart(fig, use_container_width=use_container_width, config=config)
+        return "plotly"
+    if alt is not None and isinstance(fig, alt.Chart):
+        st.altair_chart(fig, use_container_width=use_container_width)
+        return "altair"
+    st.warning("グラフを表示できませんでした。Plotly か Altair をインストールしてください。")
+    return "none"
 
 
 def apply_base_style(css_path: str = "assets/styles.css") -> None:
@@ -94,14 +117,13 @@ def render_kpi_cards(cards: List[KPIResult]) -> None:
                         unsafe_allow_html=True,
                     )
                 sparkline_fig = create_sparkline(card.sparkline_years, card.sparkline_values)
-                if sparkline_fig is None:
+                result = _render_chart(
+                    sparkline_fig,
+                    use_container_width=True,
+                    config={"displayModeBar": False},
+                )
+                if result == "none":
                     st.caption(PLOTLY_IMPORT_ERROR_MESSAGE)
-                else:
-                    st.plotly_chart(
-                        sparkline_fig,
-                        use_container_width=True,
-                        config={"displayModeBar": False},
-                    )
                 st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -112,10 +134,7 @@ def render_chart_block(title: str, fig: Optional[Figure], key: str) -> None:
             f'<div class="chart-header"><span class="chart-title">{title}</span></div>',
             unsafe_allow_html=True,
         )
-        if fig is None:
-            st.warning(PLOTLY_IMPORT_ERROR_MESSAGE)
-        else:
-            st.plotly_chart(fig, use_container_width=True)
+        _render_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -127,10 +146,8 @@ def render_chart_with_download(title: str, fig: Optional[Figure], key: str) -> N
             f'<span></span></div>',
             unsafe_allow_html=True,
         )
-        if fig is None:
-            st.warning(PLOTLY_IMPORT_ERROR_MESSAGE)
-        else:
-            st.plotly_chart(fig, use_container_width=True)
+        result = _render_chart(fig, use_container_width=True)
+        if result == "plotly" and fig is not None:
             try:
                 image_bytes = fig.to_image(format="png")
             except Exception:
@@ -142,6 +159,8 @@ def render_chart_with_download(title: str, fig: Optional[Figure], key: str) -> N
                     file_name=f"{key}.png",
                     mime="image/png",
                 )
+        elif result == "altair":
+            st.caption("PNG ダウンロードは Plotly 利用時のみ利用できます。")
         st.markdown("</div>", unsafe_allow_html=True)
 
 
