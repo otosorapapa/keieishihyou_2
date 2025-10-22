@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import codecs
 import io
 from pathlib import Path
 from typing import Iterable, Optional
 
-import chardet
 import pandas as pd
 import streamlit as st
 
@@ -30,15 +30,24 @@ class DataLoadError(RuntimeError):
 
 
 def _detect_encoding(raw: bytes) -> str:
-    """Detect encoding with chardet, prefer cp932 when uncertain."""
-    detection = chardet.detect(raw)
-    enc = detection.get("encoding")
-    if enc:
-        # Normalize to lower-case for comparison
-        normalized = enc.lower()
-        if "shift_jis" in normalized or "cp932" in normalized:
-            return DEFAULT_ENCODING
-        return enc
+    """Detect encoding using lightweight heuristics.
+
+    The CSV files we handle are primarily encoded in CP932 or UTF-8 with BOM.
+    To avoid depending on optional third-party detectors, we perform a couple of
+    quick checks: first, look for a UTF-8 BOM; otherwise try to decode with the
+    encodings we care about and return the first one that succeeds.
+    """
+
+    if raw.startswith(codecs.BOM_UTF8):
+        return FALLBACK_ENCODING
+
+    for candidate in (DEFAULT_ENCODING, "utf-8", FALLBACK_ENCODING):
+        try:
+            raw.decode(candidate)
+            return candidate
+        except UnicodeDecodeError:
+            continue
+
     return DEFAULT_ENCODING
 
 
@@ -50,7 +59,7 @@ def _read_csv_from_path(path: Path) -> pd.DataFrame:
     encoding = _detect_encoding(raw)
     buffer = io.BytesIO(raw)
 
-    for candidate in {encoding, DEFAULT_ENCODING, FALLBACK_ENCODING}:
+    for candidate in [encoding, DEFAULT_ENCODING, FALLBACK_ENCODING]:
         try:
             buffer.seek(0)
             df = pd.read_csv(buffer, encoding=candidate)
@@ -67,7 +76,7 @@ def load_uploaded_csv(file) -> pd.DataFrame:
         raise DataLoadError("アップロードされたファイルが空です。")
     buffer = io.BytesIO(raw)
     encoding = _detect_encoding(raw)
-    for candidate in {encoding, DEFAULT_ENCODING, FALLBACK_ENCODING}:
+    for candidate in [encoding, DEFAULT_ENCODING, FALLBACK_ENCODING]:
         try:
             buffer.seek(0)
             df = pd.read_csv(buffer, encoding=candidate)
