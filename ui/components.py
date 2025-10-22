@@ -4,7 +4,14 @@ from typing import TYPE_CHECKING, Callable, Iterable, List, Optional
 
 import pandas as pd
 import streamlit as st
-from st_aggrid import AgGrid, GridOptionsBuilder
+
+try:  # pragma: no cover - optional dependency
+    from st_aggrid import AgGrid, GridOptionsBuilder
+except ModuleNotFoundError:  # pragma: no cover - executed when package missing
+    AgGrid = None  # type: ignore[assignment]
+    GridOptionsBuilder = None  # type: ignore[assignment]
+
+AGGRID_IMPORT_ERROR_MESSAGE = "表の高度な表示機能を利用するには streamlit-aggrid をインストールしてください。"
 
 from services.metrics import KPIResult
 from ui.charts import FONT_FAMILY, PLOTLY_IMPORT_ERROR_MESSAGE, create_sparkline
@@ -143,11 +150,16 @@ def render_summary_table(df: pd.DataFrame) -> None:
         st.info("表示可能な年次サマリーがありません。")
         return
     table_df = df.reset_index()
-    gb = GridOptionsBuilder.from_dataframe(table_df)
-    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=10)
-    gb.configure_default_column(resizable=True, sortable=True, filter=True)
-    grid_options = gb.build()
-    AgGrid(table_df, gridOptions=grid_options, theme="streamlit")
+
+    if GridOptionsBuilder is None or AgGrid is None:
+        st.warning(AGGRID_IMPORT_ERROR_MESSAGE)
+        st.dataframe(table_df, use_container_width=True)
+    else:
+        gb = GridOptionsBuilder.from_dataframe(table_df)
+        gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=10)
+        gb.configure_default_column(resizable=True, sortable=True, filter=True)
+        grid_options = gb.build()
+        AgGrid(table_df, gridOptions=grid_options, theme="streamlit")
     csv_bytes = table_df.to_csv(index=False).encode("utf-8-sig")
     st.download_button(
         label="CSV ダウンロード",
