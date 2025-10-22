@@ -6,7 +6,25 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 import pandas as pd
-import streamlit as st
+try:
+    import streamlit as st
+except ModuleNotFoundError:  # pragma: no cover - fallback for non-Streamlit environments
+    class _StreamlitStub:
+        """Minimal stub providing ``cache_data`` decorator used in tests.
+
+        The real Streamlit package is only required when running the web
+        application. Allowing the import to succeed without Streamlit makes it
+        possible to exercise the data loading helpers in isolation (e.g. in
+        unit tests or automated scripts).
+        """
+
+        def cache_data(self, *args, **kwargs):
+            def decorator(func):
+                return func
+
+            return decorator
+
+    st = _StreamlitStub()
 
 from services.duckdb_store import DuckDBStore
 
