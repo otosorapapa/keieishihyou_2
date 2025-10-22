@@ -53,7 +53,11 @@ class DuckDBStore:
 
         self.ensure_table(df)
         if not DUCKDB_AVAILABLE:
-            raise RuntimeError(DUCKDB_IMPORT_ERROR_MESSAGE) from _DUCKDB_IMPORT_ERROR
+            LOGGER.warning(
+                "%s Falling back to CSV baseline only; uploaded data was ignored.",
+                DUCKDB_IMPORT_ERROR_MESSAGE,
+            )
+            return 0
         with self._connect() as conn:
             conn.register("tmp_df", df)
             conn.execute(
