@@ -1,9 +1,19 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Optional
 
-import duckdb
+try:  # pragma: no cover - exercised implicitly when DuckDB is available
+    import duckdb  # type: ignore
+except ModuleNotFoundError as exc:  # pragma: no cover - runtime fallback
+    duckdb = None  # type: ignore[assignment]
+    _DUCKDB_IMPORT_ERROR = exc
+else:  # pragma: no cover - exercised implicitly when DuckDB is available
+    _DUCKDB_IMPORT_ERROR = None
+
+LOGGER = logging.getLogger(__name__)
+DUCKDB_AVAILABLE = duckdb is not None
 import pandas as pd
 
 DUCKDB_PATH = Path("app.duckdb")
@@ -15,10 +25,16 @@ class DuckDBStore:
         self.path = path
 
     def _connect(self) -> duckdb.DuckDBPyConnection:
-        return duckdb.connect(str(self.path))
+        if not DUCKDB_AVAILABLE:
+            raise RuntimeError(
+                "DuckDB backend is unavailable. Install the 'duckdb' package to enable persistence."
+            ) from _DUCKDB_IMPORT_ERROR
+        return duckdb.connect(str(self.path))  # type: ignore[union-attr]
 
     def ensure_table(self, df: pd.DataFrame) -> None:
         if df.empty:
+            return
+        if not DUCKDB_AVAILABLE:
             return
         with self._connect() as conn:
             conn.register("tmp_df", df)
@@ -34,6 +50,10 @@ class DuckDBStore:
             return 0
 
         self.ensure_table(df)
+        if not DUCKDB_AVAILABLE:
+            raise RuntimeError(
+                "DuckDB backend is unavailable. Install the 'duckdb' package to enable CSV updates to persist."
+            ) from _DUCKDB_IMPORT_ERROR
         with self._connect() as conn:
             conn.register("tmp_df", df)
             conn.execute(
@@ -50,6 +70,11 @@ class DuckDBStore:
         return inserted
 
     def read_all(self) -> Optional[pd.DataFrame]:
+        if not DUCKDB_AVAILABLE:
+            LOGGER.warning(
+                "DuckDB backend is unavailable. Falling back to baseline CSV only."
+            )
+            return None
         if not self.path.exists():
             return None
         with self._connect() as conn:
