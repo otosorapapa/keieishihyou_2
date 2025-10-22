@@ -29,6 +29,7 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for non-Streamlit env
 from services.duckdb_store import DuckDBStore
 
 DATA_PATH = Path("/mnt/data/産業構造マップ_中小企業経営分析_推移　bs pl　従業員数.csv")
+FALLBACK_DATA_PATH = Path(__file__).resolve().parents[1] / "assets" / "sample_data.csv"
 DEFAULT_ENCODING = "cp932"
 FALLBACK_ENCODING = "utf-8-sig"
 KEY_COLUMNS = [
@@ -69,22 +70,39 @@ def _detect_encoding(raw: bytes) -> str:
     return DEFAULT_ENCODING
 
 
+def _candidate_paths(path: Path) -> Iterable[Path]:
+    if path.exists():
+        yield path
+        return
+
+    if path == DATA_PATH and FALLBACK_DATA_PATH.exists():
+        yield FALLBACK_DATA_PATH
+
+
 def _read_csv_from_path(path: Path) -> pd.DataFrame:
-    if not path.exists():
-        raise DataLoadError(f"CSV ファイルが見つかりません: {path}")
+    candidates = list(_candidate_paths(path))
+    if not candidates:
+        message = f"CSV ファイルが見つかりません: {path}"
+        if path == DATA_PATH:
+            message += f" または {FALLBACK_DATA_PATH}"
+        raise DataLoadError(message)
 
-    raw = path.read_bytes()
-    encoding = _detect_encoding(raw)
-    buffer = io.BytesIO(raw)
+    last_error: Optional[Exception] = None
+    for candidate in candidates:
+        raw = candidate.read_bytes()
+        encoding = _detect_encoding(raw)
+        buffer = io.BytesIO(raw)
 
-    for candidate in [encoding, DEFAULT_ENCODING, FALLBACK_ENCODING]:
-        try:
-            buffer.seek(0)
-            df = pd.read_csv(buffer, encoding=candidate)
-            return df
-        except UnicodeDecodeError:
-            continue
-    raise DataLoadError("CSV の読み込みに失敗しました。文字コードをご確認ください。")
+        for encoding_candidate in [encoding, DEFAULT_ENCODING, FALLBACK_ENCODING]:
+            try:
+                buffer.seek(0)
+                df = pd.read_csv(buffer, encoding=encoding_candidate)
+                return df
+            except UnicodeDecodeError as exc:  # pragma: no cover - extremely rare
+                last_error = exc
+                continue
+
+    raise DataLoadError("CSV の読み込みに失敗しました。文字コードをご確認ください。") from last_error
 
 
 def load_uploaded_csv(file) -> pd.DataFrame:
