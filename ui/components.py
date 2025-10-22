@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from io import BytesIO
-from typing import Callable, Iterable, List, Optional
+from typing import TYPE_CHECKING, Callable, Iterable, List, Optional
 
 import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder
 
 from services.metrics import KPIResult
-from ui.charts import FONT_FAMILY, create_sparkline
+from ui.charts import FONT_FAMILY, PLOTLY_IMPORT_ERROR_MESSAGE, create_sparkline
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from plotly.graph_objects import Figure
+else:
+    Figure = object
 
 
 def apply_base_style(css_path: str = "assets/styles.css") -> None:
@@ -84,26 +87,32 @@ def render_kpi_cards(cards: List[KPIResult]) -> None:
                         unsafe_allow_html=True,
                     )
                 sparkline_fig = create_sparkline(card.sparkline_years, card.sparkline_values)
-                st.plotly_chart(
-                    sparkline_fig,
-                    use_container_width=True,
-                    config={"displayModeBar": False},
-                )
+                if sparkline_fig is None:
+                    st.caption(PLOTLY_IMPORT_ERROR_MESSAGE)
+                else:
+                    st.plotly_chart(
+                        sparkline_fig,
+                        use_container_width=True,
+                        config={"displayModeBar": False},
+                    )
                 st.markdown("</div>", unsafe_allow_html=True)
 
 
-def render_chart_block(title: str, fig: go.Figure, key: str) -> None:
+def render_chart_block(title: str, fig: Optional[Figure], key: str) -> None:
     with st.container():
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.markdown(
             f'<div class="chart-header"><span class="chart-title">{title}</span></div>',
             unsafe_allow_html=True,
         )
-        st.plotly_chart(fig, use_container_width=True)
+        if fig is None:
+            st.warning(PLOTLY_IMPORT_ERROR_MESSAGE)
+        else:
+            st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
 
-def render_chart_with_download(title: str, fig: go.Figure, key: str) -> None:
+def render_chart_with_download(title: str, fig: Optional[Figure], key: str) -> None:
     with st.container():
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.markdown(
@@ -111,19 +120,21 @@ def render_chart_with_download(title: str, fig: go.Figure, key: str) -> None:
             f'<span></span></div>',
             unsafe_allow_html=True,
         )
-        st.plotly_chart(fig, use_container_width=True)
-        buffer = BytesIO()
-        try:
-            image_bytes = fig.to_image(format="png")
-        except Exception:
-            image_bytes = None
-        if image_bytes:
-            st.download_button(
-                label="PNG ダウンロード",
-                data=image_bytes,
-                file_name=f"{key}.png",
-                mime="image/png",
-            )
+        if fig is None:
+            st.warning(PLOTLY_IMPORT_ERROR_MESSAGE)
+        else:
+            st.plotly_chart(fig, use_container_width=True)
+            try:
+                image_bytes = fig.to_image(format="png")
+            except Exception:
+                image_bytes = None
+            if image_bytes:
+                st.download_button(
+                    label="PNG ダウンロード",
+                    data=image_bytes,
+                    file_name=f"{key}.png",
+                    mime="image/png",
+                )
         st.markdown("</div>", unsafe_allow_html=True)
 
 
