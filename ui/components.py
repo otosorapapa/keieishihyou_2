@@ -1,0 +1,176 @@
+from __future__ import annotations
+
+from io import BytesIO
+from typing import Callable, Iterable, List, Optional
+
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+from st_aggrid import AgGrid, GridOptionsBuilder
+
+from services.metrics import KPIResult
+from ui.charts import FONT_FAMILY, create_sparkline
+
+
+def apply_base_style(css_path: str = "assets/styles.css") -> None:
+    try:
+        with open(css_path, "r", encoding="utf-8") as fh:
+            css = fh.read()
+        st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.warning("スタイルシートが見つかりませんでした。")
+
+
+def format_value(value: Optional[float], value_type: str) -> str:
+    if value is None or pd.isna(value):
+        return "—"
+    if value_type == "currency":
+        return f"{value:,.0f} 百万円"
+    if value_type == "ratio":
+        return f"{value * 100:.1f}%"
+    return f"{value:,.2f}"
+
+
+def format_delta(delta: Optional[float], value_type: str) -> str:
+    if delta is None or pd.isna(delta):
+        return "前年比: —"
+    if value_type == "currency":
+        return f"前年比: {delta * 100:+.1f}%"
+    if value_type == "ratio":
+        return f"前年比: {delta * 100:+.1f}pt"
+    return f"前年比: {delta:+.1f}"
+
+
+def delta_class(delta: Optional[float]) -> str:
+    if delta is None or pd.isna(delta):
+        return ""
+    return "positive" if delta >= 0 else "negative"
+
+
+def render_kpi_cards(cards: List[KPIResult]) -> None:
+    if not cards:
+        st.info("KPI を表示するデータがありません。")
+        return
+
+    cols = st.columns(4)
+    for idx, card in enumerate(cards):
+        column = cols[idx % 4]
+        with column:
+            container = st.container()
+            with container:
+                st.markdown('<div class="kpi-card">', unsafe_allow_html=True)
+                if card.tooltip:
+                    st.markdown(
+                        f'<span class="tooltip-icon" title="{card.tooltip}">ℹ️</span>',
+                        unsafe_allow_html=True,
+                    )
+                st.markdown(
+                    f'<div class="kpi-title">{card.label}</div>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f'<div class="kpi-value">{format_value(card.latest_value, card.value_type)}</div>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f'<div class="kpi-subtext">{format_delta(card.delta_value, card.value_type)}</div>',
+                    unsafe_allow_html=True,
+                )
+                badge_class = delta_class(card.delta_value)
+                if badge_class:
+                    arrow = "↑" if card.delta_value and card.delta_value >= 0 else "↓"
+                    st.markdown(
+                        f'<span class="kpi-badge {badge_class}">{arrow}</span>',
+                        unsafe_allow_html=True,
+                    )
+                sparkline_fig = create_sparkline(card.sparkline_years, card.sparkline_values)
+                st.plotly_chart(
+                    sparkline_fig,
+                    use_container_width=True,
+                    config={"displayModeBar": False},
+                )
+                st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_chart_block(title: str, fig: go.Figure, key: str) -> None:
+    with st.container():
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="chart-header"><span class="chart-title">{title}</span></div>',
+            unsafe_allow_html=True,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_chart_with_download(title: str, fig: go.Figure, key: str) -> None:
+    with st.container():
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="chart-header"><span class="chart-title">{title}</span>'
+            f'<span></span></div>',
+            unsafe_allow_html=True,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        buffer = BytesIO()
+        try:
+            image_bytes = fig.to_image(format="png")
+        except Exception:
+            image_bytes = None
+        if image_bytes:
+            st.download_button(
+                label="PNG ダウンロード",
+                data=image_bytes,
+                file_name=f"{key}.png",
+                mime="image/png",
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_summary_table(df: pd.DataFrame) -> None:
+    if df is None or df.empty:
+        st.info("表示可能な年次サマリーがありません。")
+        return
+    table_df = df.reset_index()
+    gb = GridOptionsBuilder.from_dataframe(table_df)
+    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=10)
+    gb.configure_default_column(resizable=True, sortable=True, filter=True)
+    grid_options = gb.build()
+    AgGrid(table_df, gridOptions=grid_options, theme="streamlit")
+    csv_bytes = table_df.to_csv(index=False).encode("utf-8-sig")
+    st.download_button(
+        label="CSV ダウンロード",
+        data=csv_bytes,
+        file_name="年次KPI一覧.csv",
+        mime="text/csv",
+    )
+
+
+def show_toast(message: str, icon: str = "✅") -> None:
+    st.toast(f"{icon} {message}")
+
+
+def render_suggestions(suggestions: dict) -> None:
+    if not suggestions:
+        return
+    st.warning("選択された組合せのデータは未登録です。以下を参考にしてください。")
+    if "same_major" in suggestions and not suggestions["same_major"].empty:
+        st.markdown("#### 同一大分類の他業種")
+        st.dataframe(suggestions["same_major"], use_container_width=True)
+    if "overall" in suggestions and not suggestions["overall"].empty:
+        st.markdown("#### 他の大分類候補")
+        st.dataframe(suggestions["overall"], use_container_width=True)
+
+
+__all__ = [
+    "AgGrid",
+    "apply_base_style",
+    "format_delta",
+    "format_value",
+    "render_chart_block",
+    "render_chart_with_download",
+    "render_kpi_cards",
+    "render_suggestions",
+    "render_summary_table",
+    "show_toast",
+]

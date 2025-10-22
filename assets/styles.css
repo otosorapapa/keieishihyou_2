@@ -1,0 +1,105 @@
+@font-face {
+  font-family: 'Hiragino Kaku Gothic ProN';
+  src: local('Hiragino Kaku Gothic ProN'), local('ヒラギノ角ゴ ProN W3');
+  font-display: swap;
+}
+html, body, [class*="css"] {
+  font-family: 'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Meiryo',sans-serif;
+}
+
+:root {
+  --card-bg: rgba(255, 255, 255, 0.85);
+  --card-border: rgba(0, 0, 0, 0.05);
+  --card-shadow: 0px 10px 30px rgba(0, 0, 0, 0.08);
+  --accent-color: #2563eb;
+  --positive-color: #16a34a;
+  --negative-color: #dc2626;
+  --muted-color: #6b7280;
+}
+
+.kpi-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: var(--card-shadow);
+  position: relative;
+  min-height: 180px;
+}
+
+.kpi-card .kpi-title {
+  font-size: 1.0rem;
+  color: #111827;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.kpi-card .kpi-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.kpi-card .kpi-subtext {
+  font-size: 0.9rem;
+  color: var(--muted-color);
+}
+
+.kpi-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent-color);
+}
+
+.kpi-badge.positive {
+  background: rgba(22, 163, 74, 0.12);
+  color: var(--positive-color);
+}
+
+.kpi-badge.negative {
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--negative-color);
+}
+
+.sparkline {
+  margin-top: 12px;
+}
+
+.chart-container {
+  background: rgba(255, 255, 255, 0.9);
+  padding: 20px 24px;
+  border-radius: 18px;
+  box-shadow: var(--card-shadow);
+  margin-bottom: 28px;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.chart-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.download-button {
+  font-size: 0.85rem;
+  color: var(--accent-color);
+}
+
+.tooltip-icon {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  font-size: 0.8rem;
+  color: var(--muted-color);
+}
