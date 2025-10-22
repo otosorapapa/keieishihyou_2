@@ -17,7 +17,16 @@ from services.data_loader import (
 )
 from services.duckdb_store import DuckDBStore
 from services.metrics import build_kpi_cards, build_summary_table, compute_yearly_metrics
-from ui import charts
+from ui.messages import PLOTLY_IMPORT_ERROR_MESSAGE
+
+try:
+    from ui import charts
+except ModuleNotFoundError as exc:  # pragma: no cover - environment specific
+    if exc.name and exc.name.startswith("plotly"):
+        st.error(PLOTLY_IMPORT_ERROR_MESSAGE)
+        st.stop()
+    raise
+
 from ui.components import (
     apply_base_style,
     render_chart_with_download,

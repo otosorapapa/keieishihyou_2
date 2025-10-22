@@ -20,15 +20,16 @@ except ModuleNotFoundError:  # pragma: no cover - executed when package missing
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from plotly.graph_objects import Figure as PlotlyFigure
 else:
-PlotlyFigure = Any
+    PlotlyFigure = Any
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from altair import Chart as AltairChart
 else:
     AltairChart = Any
 
+from ui.messages import PLOTLY_IMPORT_ERROR_MESSAGE
+
 FONT_FAMILY = "Hiragino Kaku Gothic ProN, Hiragino Sans, Noto Sans JP, Meiryo, sans-serif"
-PLOTLY_IMPORT_ERROR_MESSAGE = "Plotly がインストールされていないためグラフを表示できません。requirements.txt を参照して Plotly を追加してください。"
 
 
 def _plotly_available() -> bool:
