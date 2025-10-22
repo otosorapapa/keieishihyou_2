@@ -19,7 +19,8 @@ except ModuleNotFoundError:  # pragma: no cover - executed when package missing
 AGGRID_IMPORT_ERROR_MESSAGE = "表の高度な表示機能を利用するには streamlit-aggrid をインストールしてください。"
 
 from services.metrics import KPIResult
-from ui.charts import FONT_FAMILY, PLOTLY_IMPORT_ERROR_MESSAGE, create_sparkline
+from ui.charts import FONT_FAMILY, create_sparkline
+from ui.messages import PLOTLY_IMPORT_ERROR_MESSAGE
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from plotly.graph_objects import Figure
